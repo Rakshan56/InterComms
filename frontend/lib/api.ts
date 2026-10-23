@@ -1,1 +1,13 @@
-export const api = async <T>(path: string, options?: RequestInit): Promise<T> => { const response = await fetch(`http://localhost:4000/api/v1${path}`, { ...options, credentials: "include", headers: { "content-type": "application/json", ...options?.headers } }); if (!response.ok) throw new Error((await response.json()).error?.message ?? "Request failed"); return (await response.json()).data as T; };
+export const api = async <T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> => {
+  const response = await fetch(`http://localhost:4000/api/v1${path}`, {
+    ...options,
+    credentials: "include",
+    headers: { "content-type": "application/json", ...options?.headers },
+  });
+  if (!response.ok)
+    throw new Error((await response.json()).error?.message ?? "Request failed");
+  return (await response.json()).data as T;
+};
