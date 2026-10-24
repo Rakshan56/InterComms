@@ -4,14 +4,210 @@ import { useParams } from "next/navigation";
 import { Shell } from "../../../../components/shell";
 import { api } from "../../../../lib/api";
 export default function Tasks() {
-  const { id } = useParams<{ id: string }>(); const [tasks, setTasks] = useState<any[]>([]); const [error, setError] = useState(""); const [showForm, setShowForm] = useState(false); const [saving, setSaving] = useState(false); const [form, setForm] = useState({ title: "", description: "", priority: "MEDIUM", dueDate: "" });
-  useEffect(() => { if (id) api<any[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => setError("Unable to load project tasks.")); }, [id]);
-  const progress = tasks.length ? Math.round(tasks.filter(task => task.status === "DONE").length / tasks.length * 100) : 0;
+  const { id } = useParams<{ id: string }>();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    priority: "MEDIUM",
+    dueDate: "",
+  });
+  useEffect(() => {
+    if (id)
+      api<any[]>(`/projects/${id}/tasks`)
+        .then(setTasks)
+        .catch(() => setError("Unable to load project tasks."));
+  }, [id]);
+  const progress = tasks.length
+    ? Math.round(
+        (tasks.filter((task) => task.status === "DONE").length / tasks.length) *
+          100,
+      )
+    : 0;
   async function updateStatus(task: any, status: string) {
     setError("");
-    try { const updated = await api<any>(`/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ version: task.version, status }) }); setTasks(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update task status."); }
+    try {
+      const updated = await api<any>(`/tasks/${task.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ version: task.version, status }),
+      });
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === updated.id ? { ...item, ...updated } : item,
+        ),
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to update task status.",
+      );
+    }
   }
-  async function createTask(event: React.FormEvent) { event.preventDefault(); if (!form.title.trim()) return; setSaving(true); setError(""); try { const task = await api<any>(`/projects/${id}/tasks`, { method: "POST", body: JSON.stringify({ title: form.title, description: form.description || undefined, priority: form.priority, dueDate: form.dueDate ? new Date(`${form.dueDate}T00:00:00`).toISOString() : undefined }) }); setTasks(current => [task, ...current]); setForm({ title: "", description: "", priority: "MEDIUM", dueDate: "" }); setShowForm(false); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to create task."); } finally { setSaving(false); } }
-  return <Shell title="Project tasks"><div className="mb-5 card p-6"><div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#89909b]">Project progress</p><p className="mt-2 text-3xl font-extrabold">{progress}%</p></div><div className="flex items-center gap-4"><p className="text-xs text-[#89909b]">{tasks.filter(task => task.status === "DONE").length} of {tasks.length} tasks complete</p><button onClick={() => setShowForm(current => !current)} className="rounded-lg bg-[#252b35] px-4 py-2.5 text-xs font-bold text-white">{showForm ? "Close" : "+ Add task"}</button></div></div><div className="mt-4 h-2 rounded-full bg-[#edf0f3]"><div className="h-2 rounded-full bg-[#4774d9] transition-all" style={{ width: `${progress}%` }} /></div></div>{showForm && <form onSubmit={createTask} className="card mb-5 grid gap-4 p-6 md:grid-cols-2"><label className="text-sm font-bold md:col-span-2">Task title<input required value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="e.g. Prepare launch checklist" className="mt-2 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal outline-none focus:border-[#4774d9]" /></label><label className="text-sm font-bold md:col-span-2">Description<textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="What needs to be done?" className="mt-2 min-h-24 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal outline-none focus:border-[#4774d9]" /></label><label className="text-sm font-bold">Priority<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value })} className="mt-2 w-full rounded-lg border border-[#e1e4e8] bg-white p-3 text-sm font-normal"><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></select></label><label className="text-sm font-bold">Due date<input type="date" value={form.dueDate} onChange={event => setForm({ ...form, dueDate: event.target.value })} className="mt-2 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal" /></label><div className="md:col-span-2"><button disabled={saving} className="rounded-lg bg-[#4774d9] px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? "Adding…" : "Add task"}</button></div></form>}{error && <p className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}<div className="card overflow-hidden"><div className="border-b border-black/5 p-6"><p className="text-sm text-[#89909b]">Change a task status to update the project progress automatically.</p></div><div className="divide-y divide-black/5">{tasks.map(t => <div key={t.id} className="flex items-center justify-between gap-4 p-5 hover:bg-[#fafbfc]"><a href={`/tasks/${t.id}`} className="min-w-0 flex-1"><p className="font-bold">{t.title}</p><p className="mt-1 text-xs text-[#89909b]">{t.assignee?.name || "Unassigned"} · {t.priority.toLowerCase()} · Open details →</p></a><select aria-label={`Status for ${t.title}`} value={t.status} onChange={event => updateStatus(t, event.target.value)} className="rounded-lg border border-[#e1e4e8] bg-white px-3 py-2 text-xs font-bold outline-none"><option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="IN_REVIEW">In review</option><option value="DONE">Done</option></select></div>)}</div></div></Shell>;
+  async function createTask(event: React.FormEvent) {
+    event.preventDefault();
+    if (!form.title.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const task = await api<any>(`/projects/${id}/tasks`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description || undefined,
+          priority: form.priority,
+          dueDate: form.dueDate
+            ? new Date(`${form.dueDate}T00:00:00`).toISOString()
+            : undefined,
+        }),
+      });
+      setTasks((current) => [task, ...current]);
+      setForm({ title: "", description: "", priority: "MEDIUM", dueDate: "" });
+      setShowForm(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to create task.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <Shell title="Project tasks">
+      <div className="mb-5 card p-6">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#89909b]">
+              Project progress
+            </p>
+            <p className="mt-2 text-3xl font-extrabold">{progress}%</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-[#89909b]">
+              {tasks.filter((task) => task.status === "DONE").length} of{" "}
+              {tasks.length} tasks complete
+            </p>
+            <button
+              onClick={() => setShowForm((current) => !current)}
+              className="rounded-lg bg-[#252b35] px-4 py-2.5 text-xs font-bold text-white"
+            >
+              {showForm ? "Close" : "+ Add task"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 h-2 rounded-full bg-[#edf0f3]">
+          <div
+            className="h-2 rounded-full bg-[#4774d9] transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+      {showForm && (
+        <form
+          onSubmit={createTask}
+          className="card mb-5 grid gap-4 p-6 md:grid-cols-2"
+        >
+          <label className="text-sm font-bold md:col-span-2">
+            Task title
+            <input
+              required
+              value={form.title}
+              onChange={(event) =>
+                setForm({ ...form, title: event.target.value })
+              }
+              placeholder="e.g. Prepare launch checklist"
+              className="mt-2 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal outline-none focus:border-[#4774d9]"
+            />
+          </label>
+          <label className="text-sm font-bold md:col-span-2">
+            Description
+            <textarea
+              value={form.description}
+              onChange={(event) =>
+                setForm({ ...form, description: event.target.value })
+              }
+              placeholder="What needs to be done?"
+              className="mt-2 min-h-24 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal outline-none focus:border-[#4774d9]"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            Priority
+            <select
+              value={form.priority}
+              onChange={(event) =>
+                setForm({ ...form, priority: event.target.value })
+              }
+              className="mt-2 w-full rounded-lg border border-[#e1e4e8] bg-white p-3 text-sm font-normal"
+            >
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </label>
+          <label className="text-sm font-bold">
+            Due date
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(event) =>
+                setForm({ ...form, dueDate: event.target.value })
+              }
+              className="mt-2 w-full rounded-lg border border-[#e1e4e8] p-3 text-sm font-normal"
+            />
+          </label>
+          <div className="md:col-span-2">
+            <button
+              disabled={saving}
+              className="rounded-lg bg-[#4774d9] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "Add task"}
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      <div className="card overflow-hidden">
+        <div className="border-b border-black/5 p-6">
+          <p className="text-sm text-[#89909b]">
+            Change a task status to update the project progress automatically.
+          </p>
+        </div>
+        <div className="divide-y divide-black/5">
+          {tasks.map((t) => (
+            <div
+              key={t.id}
+              className="flex items-center justify-between gap-4 p-5 hover:bg-[#fafbfc]"
+            >
+              <a href={`/tasks/${t.id}`} className="min-w-0 flex-1">
+                <p className="font-bold">{t.title}</p>
+                <p className="mt-1 text-xs text-[#89909b]">
+                  {t.assignee?.name || "Unassigned"} ·{" "}
+                  {t.priority.toLowerCase()} · Open details →
+                </p>
+              </a>
+              <select
+                aria-label={`Status for ${t.title}`}
+                value={t.status}
+                onChange={(event) => updateStatus(t, event.target.value)}
+                className="rounded-lg border border-[#e1e4e8] bg-white px-3 py-2 text-xs font-bold outline-none"
+              >
+                <option value="TODO">To do</option>
+                <option value="IN_PROGRESS">In progress</option>
+                <option value="IN_REVIEW">In review</option>
+                <option value="DONE">Done</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Shell>
+  );
 }
